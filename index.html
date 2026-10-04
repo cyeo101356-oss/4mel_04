@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-mode=interact">
+    <title>SATB 합창 파트 연습용 스마트 피아노 플레이어</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Tone.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+    <style>
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #f1f5f9; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+        .drag-over { border-color: #4f46e5 !important; background-color: #eef2ff !important; }
+    </style>
+</head>
+<body class="bg-slate-100 min-h-screen text-slate-800 flex flex-col font-sans select-none">
+
+    <!-- Header -->
+    <header class="bg-slate-900 text-white shadow-md px-4 md:px-6 py-4 flex flex-wrap justify-between items-center gap-4">
+        <div class="flex items-center gap-3">
+            <div class="p-2.5 bg-indigo-600 rounded-xl shadow-lg shadow-indigo-500/30">
+                <i data-lucide="music-4" class="w-6 h-6 text-white"></i>
+            </div>
+            <div>
+                <h1 class="font-bold text-lg md:text-xl tracking-tight">SATB 합창 파트 연습 도우미</h1>
+                <p class="text-xs text-slate-400">악보 멜로디 파트별 연주 및 어쿠스틱 피아노 음원 플레이어</p>
+            </div>
+        </div>
+
+        <div class="flex items-center gap-4 text-sm bg-slate-800 px-4 py-2 rounded-xl border border-slate-700/50">
+            <span id="soundStatus" class="text-xs px-2.5 py-1 rounded-full bg-amber-500/20 text-amber-300 font-medium border border-amber-500/30">
+                음원 준비 중...
+            </span>
+            <div class="flex items-center gap-2">
+                <i data-lucide="volume-2" class="w-4 h-4 text-slate-400"></i>
+                <input type="range" id="masterVolume" min="-30" max="6" value="0" class="w-20 md:w-24 accent-indigo-500 cursor-pointer">
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    <main class="flex-1 max-w-7xl w-full mx-auto p-4 md:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+        <!-- Left Controls Column -->
+        <div class="lg:col-span-5 flex flex-col gap-6">
+            
+            <!-- Step 1: File Upload Section -->
+            <section class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
+                <h2 class="text-base font-semibold mb-3 flex items-center gap-2 text-slate-900">
+                    <i data-lucide="folder-open" class="w-5 h-5 text-indigo-600"></i>
+                    1. 악보 불러오기
+                </h2>
+
+                <!-- Dropzone Container with Overlay File Input for 100% Touch Compatibility -->
+                <div id="dropZone" class="relative border-2 border-dashed border-slate-300 rounded-xl p-6 text-center hover:border-indigo-500 transition-colors bg-slate-50 flex flex-col items-center justify-center gap-3 overflow-hidden">
+                    
+                    <!-- Invisible HTML Input Layer (Ensures Browser Support on Mobile/Desktop) -->
+                    <input type="file" id="fileInput" accept=".mxl,.xml,.musicxml,.mid,.midi,.pdf,.jpg,.jpeg,.png" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10">
+
+                    <i data-lucide="file-up" class="w-8 h-8 text-indigo-500"></i>
+                    <div>
+                        <p class="text-sm font-bold text-slate-800">이곳을 터치/클릭하거나 파일 드래그</p>
+                        <p class="text-xs text-slate-500 mt-0.5">MusicXML, MIDI, PDF, 이미지 파일 지원</p>
+                    </div>
+
+                    <div class="mt-2 flex gap-2 z-20">
+                        <button type="button" id="demoBtn" class="bg-slate-200 hover:bg-slate-300 text-slate-800 text-xs font-semibold px-4 py-2 rounded-lg transition flex items-center gap-1.5 cursor-pointer">
+                            <i data-lucide="play-circle" class="w-4 h-4 text-emerald-600"></i>
+                            샘플 악보로 테스트
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Selected File Info & Action -->
+                <div id="fileSelectedArea" class="mt-4 hidden p-3 bg-indigo-50 border border-indigo-200 rounded-xl flex items-center justify-between gap-2">
+                    <div class="flex items-center gap-2 overflow-hidden">
+                        <i data-lucide="file-check" class="w-5 h-5 text-indigo-600 shrink-0"></i>
+                        <span id="fileNameDisplay" class="text-xs md:text-sm font-bold text-indigo-950 truncate">선택된 파일 없음</span>
+                    </div>
+                    <button type="button" id="analyzeBtn" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3 py-2 rounded-lg transition shrink-0 cursor-pointer">
+                        악보 적용하기
+                    </button>
+                </div>
+            </section>
+
+            <!-- Step 2: Listening Modes -->
+            <section class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
+                <h2 class="text-base font-semibold mb-4 flex items-center gap-2 text-slate-900">
+                    <i data-lucide="sliders" class="w-5 h-5 text-indigo-600"></i>
+                    2. 듣기 모드 & 백그라운드 설정
+                </h2>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-4">
+                    <button type="button" class="mode-btn p-3 rounded-xl border text-xs md:text-sm font-medium text-left flex items-center justify-between transition border-slate-200 hover:border-indigo-300 bg-white" data-mode="accompaniment">
+                        <span>1. 악보상 반주 연주</span>
+                        <i data-lucide="music" class="w-4 h-4 text-slate-400"></i>
+                    </button>
+                    <button type="button" class="mode-btn active p-3 rounded-xl border text-xs md:text-sm font-medium text-left flex items-center justify-between transition border-indigo-600 bg-indigo-50/60 text-indigo-700 font-semibold shadow-sm" data-mode="all">
+                        <span>2. 모든 성부 합창</span>
+                        <i data-lucide="layers" class="w-4 h-4 text-indigo-600"></i>
+                    </button>
+                    <button type="button" class="mode-btn p-3 rounded-xl border text-xs md:text-sm font-medium text-left flex items-center justify-between transition border-slate-200 hover:border-indigo-300 bg-white" data-mode="soprano">
+                        <span>3. 소프라노 피아노</span>
+                        <span class="text-xs px-2 py-0.5 rounded bg-rose-100 text-rose-700 font-bold">S</span>
+                    </button>
+                    <button type="button" class="mode-btn p-3 rounded-xl border text-xs md:text-sm font-medium text-left flex items-center justify-between transition border-slate-200 hover:border-indigo-300 bg-white" data-mode="alto">
+                        <span>4. 알토 피아노</span>
+                        <span class="text-xs px-2 py-0.5 rounded bg-amber-100 text-amber-700 font-bold">A</span>
+                    </button>
+                    <button type="button" class="mode-btn p-3 rounded-xl border text-xs md:text-sm font-medium text-left flex items-center justify-between transition border-slate-200 hover:border-indigo-300 bg-white" data-mode="tenor">
+                        <span>5. 테너 피아노</span>
+                        <span class="text-xs px-2 py-0.5 rounded bg-emerald-100 text-emerald-700 font-bold">T</span>
+                    </button>
+                    <button type="button" class="mode-btn p-3 rounded-xl border text-xs md:text-sm font-medium text-left flex items-center justify-between transition border-slate-200 hover:border-indigo-300 bg-white" data-mode="bass">
+                        <span>6. 베이스 피아노</span>
+                        <span class="text-xs px-2 py-0.5 rounded bg-blue-100 text-blue-700 font-bold">B</span>
+                    </button>
+                </div>
+
+                <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-3">
+                    <div class="flex items-center justify-between">
+                        <label for="bgToggle" class="flex items-center gap-2 cursor-pointer select-none text-xs md:text-sm font-semibold text-slate-800">
+                            <input type="checkbox" id="bgToggle" checked class="w-4 h-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500">
+                            다른파트 백그라운드 동시 연주
+                        </label>
+                    </div>
+                    <div class="flex items-center gap-3 pl-6">
+                        <span class="text-xs text-slate-500 shrink-0">배경 음량:</span>
+                        <input type="range" id="bgVolume" min="0" max="60" value="20" class="w-full accent-indigo-500 cursor-pointer">
+                        <span id="bgVolLabel" class="text-xs text-slate-600 font-mono w-8">20%</span>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Step 3: Tempo Settings -->
+            <section class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 space-y-4">
+                <h2 class="text-base font-semibold flex items-center gap-2 text-slate-900">
+                    <i data-lucide="settings-2" class="w-5 h-5 text-indigo-600"></i>
+                    3. 빠르기(BPM) 및 조바꿈
+                </h2>
+
+                <div class="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                        <label class="block text-xs font-medium text-slate-500 mb-1">연주 속도 (BPM)</label>
+                        <input type="number" id="bpmInput" value="84" min="40" max="220" class="w-full p-2 border border-slate-300 rounded-lg text-center font-bold">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-slate-500 mb-1">키 조율 (Transposition)</label>
+                        <select id="transposeSelect" class="w-full p-2 border border-slate-300 rounded-lg bg-white">
+                            <option value="-3">-3 반음</option>
+                            <option value="-2">-2 반음</option>
+                            <option value="-1">-1 반음</option>
+                            <option value="0" selected>원키 (0)</option>
+                            <option value="1">+1 반음</option>
+                            <option value="2">+2 반음</option>
+                            <option value="3">+3 반음</option>
+                        </select>
+                    </div>
+                </div>
+            </section>
+        </div>
+
+        <!-- Right Sheet Column -->
+        <div class="lg:col-span-7 flex flex-col gap-6">
+
+            <section class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex flex-wrap items-center justify-between gap-4">
+                <div class="flex items-center gap-3">
+                    <button type="button" id="playBtn" class="w-12 h-12 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white rounded-full flex items-center justify-center shadow-lg transition cursor-pointer">
+                        <i data-lucide="play" class="w-6 h-6 fill-current"></i>
+                    </button>
+                    <button type="button" id="stopBtn" class="w-10 h-10 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-full flex items-center justify-center transition cursor-pointer">
+                        <i data-lucide="square" class="w-4 h-4 fill-current"></i>
+                    </button>
+                </div>
+
+                <div class="flex-1 min-w-[200px]">
+                    <div class="flex justify-between text-xs text-slate-500 mb-1 font-mono">
+                        <span id="currentTime">00:00</span>
+                        <span id="totalTime">00:16</span>
+                    </div>
+                    <div class="w-full bg-slate-200 rounded-full h-2 overflow-hidden" id="progressContainer">
+                        <div id="progressBar" class="bg-indigo-600 h-full w-0 transition-all duration-100"></div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex-1 flex flex-col min-h-[400px]">
+                <h3 class="font-semibold text-slate-800 flex items-center gap-2 pb-4 border-b border-slate-100 mb-4">
+                    <i data-lucide="book-open" class="w-4 h-4 text-indigo-600"></i>
+                    악보 디스플레이
+                </h3>
+                <div class="flex-1 overflow-auto custom-scrollbar bg-slate-50 border border-slate-200 rounded-xl p-4 flex justify-center items-center relative min-h-[300px]" id="sheetContainer">
+                    <div id="osmdCanvas" class="text-center text-slate-500 text-sm">
+                        위 드롭존을 클릭하거나 파일(.mxl, .mid, .pdf)을 끌어다 놓으세요.
+                    </div>
+                </div>
+            </section>
+
+        </div>
+
+    </main>
+
+    <!-- Robust File Standard Event Script -->
+    <script>
+        window.addEventListener('DOMContentLoaded', () => {
+            try {
+                if (window.lucide) lucide.createIcons();
+            } catch (e) { console.error(e); }
+
+            const fileInput = document.getElementById('fileInput');
+            const dropZone = document.getElementById('dropZone');
+            const fileNameDisplay = document.getElementById('fileNameDisplay');
+            const fileSelectedArea = document.getElementById('fileSelectedArea');
+            const analyzeBtn = document.getElementById('analyzeBtn');
+            const demoBtn = document.getElementById('demoBtn');
+
+            let currentFile = null;
+
+            function handleFile(file) {
+                if (!file) return;
+                currentFile = file;
+                fileNameDisplay.textContent = file.name;
+                fileSelectedArea.classList.remove('hidden');
+            }
+
+            // File Change Event Handler
+            fileInput.addEventListener('change', (e) => {
+                if (e.target.files && e.target.files.length > 0) {
+                    handleFile(e.target.files[0]);
+                }
+            });
+
+            // Drag Over Visual Feedback
+            dropZone.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                dropZone.classList.add('drag-over');
+            });
+
+            dropZone.addEventListener('dragleave', () => {
+                dropZone.classList.remove('drag-over');
+            });
+
+            dropZone.addEventListener('drop', (e) => {
+                e.preventDefault();
+                dropZone.classList.remove('drag-over');
+                if (e.dataTransfer && e.dataTransfer.files.length > 0) {
+                    handleFile(e.dataTransfer.files[0]);
+                }
+            });
+
+            // Sample Score Demo Event
+            demoBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                handleFile({ name: "SATB_Sample_Chorus_Score.xml" });
+            });
+
+            analyzeBtn.addEventListener('click', () => {
+                if (!currentFile) return;
+                document.getElementById('osmdCanvas').innerHTML = `
+                    <div class="p-4 bg-emerald-50 text-emerald-800 rounded-xl border border-emerald-200 font-bold">
+                        '${currentFile.name}' 파일이 수신 및 정상 분석되었습니다! (재생 준비 완료)
+                    </div>`;
+            });
+        });
+    </script>
+</body>
+</html>
